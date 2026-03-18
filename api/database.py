@@ -38,7 +38,13 @@ if db_url.startswith("postgresql://"):
 engine = create_async_engine(
     db_url, 
     echo=True,
-    connect_args={"ssl": "require"} # Required for Supabase/Vercel
+    connect_args={
+        
+        "ssl": "require",
+        "statement_cache_size": 0,  
+        "prepared_statement_cache_size": 0
+    }
+
 )
 
 # Session factory
