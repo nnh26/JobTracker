@@ -144,35 +144,63 @@ export default function Dashboard() {
     } catch (err) { toast.error("Failed to create job"); }
   };
 
-  const handleDelete = async (jobId) => {
-  // Use window.confirm for safety
-  if (!window.confirm('Are you sure you want to delete this application?')) return;
-  
+ const handleDelete = (jobId) => {
+  toast((t) => (
+    <div className="flex flex-col gap-3 min-w-[200px]">
+      <p className="text-sm font-bold text-slate-800">Delete this application?</p>
+      <div className="flex gap-2 justify-end">
+        <button
+          onClick={() => toast.dismiss(t.id)}
+          className="px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-600 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            toast.dismiss(t.id);
+            executeDelete(jobId); 
+          }}
+          className="px-4 py-1.5 bg-rose-500 text-white rounded-lg text-[11px] font-black uppercase tracking-wider shadow-lg shadow-rose-100 hover:bg-rose-600 transition"
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  ), {
+    duration: 5000,
+    position: 'top-center',
+    style: { 
+      borderRadius: '20px', 
+      padding: '16px',
+      border: '1px solid #fee2e2' 
+    }
+  });
+};
+const executeDelete = async (jobId) => {
   try {
-    // 1. Get the token from localStorage
     const token = localStorage.getItem("token");
     
-    // 2. Perform the DELETE request with the Token
     const response = await fetch(`/api/jobs/${jobId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${token}`, 
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
 
     if (response.ok) {
-      toast.success("Job deleted successfully"); 
+      toast.success("Application removed");
       loadJobs(); 
     } else {
       const errorData = await response.json();
-      toast.error(errorData.detail || "Failed to delete");
+      toast.error(errorData.detail || "Delete failed");
     }
-  } catch (err) { 
+  } catch (err) {
     console.error(err);
-    toast.error("An error occurred while deleting"); 
+    toast.error("Server error during deletion");
   }
 };
+
 
   const statusStyles = {
     saved: 'bg-slate-100 text-slate-600 border-slate-200',
