@@ -38,13 +38,16 @@ export default function Dashboard() {
     try {
       const res = await jobsAPI.getAll();
       setJobs(res.data);
-    } catch (err) { console.error("Failed to load jobs:", err); }
+    } catch (err) { 
+      console.error("Failed to load jobs:", err); 
+    }
   };
 
+  // ACTUAL DELETE LOGIC (Now inside the component scope)
   const executeDelete = async (jobId) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/jobs/${jobId}`, {
+      const response = await fetch(`${window.location.origin}/api/jobs/${jobId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -60,10 +63,12 @@ export default function Dashboard() {
         toast.error(errorData.detail || "Delete failed");
       }
     } catch (err) {
+      console.error("Delete Error:", err);
       toast.error("Server error during deletion");
     }
   };
 
+  // UI CONFIRMATION TOAST
   const handleDelete = (jobId) => {
     toast((t) => (
       <div className="flex flex-col gap-3 min-w-[200px]">
@@ -107,7 +112,6 @@ export default function Dashboard() {
       reader.onload = async (event) => {
         try {
           const typedarray = new Uint8Array(event.target.result);
-          // Changed pdfjsLib to pdfjs to match your import
           const pdf = await pdfjs.getDocument(typedarray).promise;
           let fullText = "";
           for (let i = 1; i <= pdf.numPages; i++) {
