@@ -183,6 +183,21 @@ async def analyze_match(data: dict = Body(...)):
     except Exception as e:
         print(f"Detailed AI Error: {str(e)}") # Visible in Vercel Logs
         raise HTTPException(status_code=500, detail="AI Analysis timed out or failed. Please try a shorter description.")
+    
+#SAVE RESUME ENDPOINT
+@app.post("/api/user/save-resume")
+async def save_resume(
+    data: dict = Body(...), 
+    db: AsyncSession = Depends(get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    text = data.get("resumeText")
+    if not text:
+        raise HTTPException(status_code=400, detail="No text provided")
+    
+    current_user.resume_text = text
+    await db.commit()
+    return {"message": "Resume saved to profile!"}
 
 # --- 5. AUTH ENDPOINTS ---
 
