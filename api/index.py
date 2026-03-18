@@ -91,6 +91,8 @@ async def parse_resume(file: UploadFile = File(...)):
 
 # --- 3. JOB ENDPOINTS ---
 
+# --- 3. JOB ENDPOINTS ---
+
 @app.get("/api/jobs", response_model=List[schemas.JobResponse])
 async def get_jobs(
     db: AsyncSession = Depends(get_db),
@@ -109,7 +111,6 @@ async def create_job(
     db: AsyncSession = Depends(get_db), 
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Handle Company Logic
     res = await db.execute(select(models.Company).where(models.Company.name == job.company_name))
     company = res.scalar_one_or_none() or models.Company(name=job.company_name)
     if not company.id:
@@ -130,7 +131,6 @@ async def create_job(
     await db.commit()
     await db.refresh(db_job)
     
-    # Reload with eager loading for the response
     result = await db.execute(
         select(models.Job)
         .where(models.Job.id == db_job.id)
@@ -138,6 +138,7 @@ async def create_job(
     )
     return result.scalar_one()
 
+# ADD THIS DELETE ROUTE HERE
 @app.delete("/api/jobs/{job_id}")
 async def delete_job(
     job_id: int, 
@@ -150,7 +151,7 @@ async def delete_job(
     job = result.scalar_one_or_none()
     
     if not job:
-        raise HTTPException(status_code=404, detail="Job application not found")
+        raise HTTPException(status_code=404, detail="Job not found")
 
     await db.delete(job)
     await db.commit()
