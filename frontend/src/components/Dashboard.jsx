@@ -8,10 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as pdfjs from 'pdfjs-dist';
-
-// Fix for PDF worker path
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
 export default function Dashboard() {
   // --- STATE ---
   const [view, setView] = useState('overview'); 
@@ -20,8 +17,8 @@ export default function Dashboard() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [aiError, setAiError] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   const [resumeText, setResumeText] = useState(localStorage.getItem('resume_text') || '');
   const [fileName, setFileName] = useState(localStorage.getItem('resume_filename') || '');
@@ -38,64 +35,7 @@ export default function Dashboard() {
     try {
       const res = await jobsAPI.getAll();
       setJobs(res.data);
-    } catch (err) { 
-      console.error("Failed to load jobs:", err); 
-    }
-  };
-
-  // ACTUAL DELETE LOGIC (Now inside the component scope)
-  const executeDelete = async (jobId) => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${window.location.origin}/api/jobs/${jobId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        toast.success("Application removed");
-        loadJobs(); 
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || "Delete failed");
-      }
-    } catch (err) {
-      console.error("Delete Error:", err);
-      toast.error("Server error during deletion");
-    }
-  };
-
-  // UI CONFIRMATION TOAST
-  const handleDelete = (jobId) => {
-    toast((t) => (
-      <div className="flex flex-col gap-3 min-w-[200px]">
-        <p className="text-sm font-bold text-slate-800">Delete this application?</p>
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-600 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              toast.dismiss(t.id);
-              executeDelete(jobId); 
-            }}
-            className="px-4 py-1.5 bg-rose-500 text-white rounded-lg text-[11px] font-black uppercase tracking-wider shadow-lg shadow-rose-100 hover:bg-rose-600 transition"
-          >
-            Confirm
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: 5000,
-      position: 'top-center',
-      style: { borderRadius: '20px', padding: '16px', border: '1px solid #fee2e2' }
-    });
+    } catch (err) { console.error("Failed to load jobs:", err); }
   };
 
   const handleLogout = () => {
@@ -112,7 +52,7 @@ export default function Dashboard() {
       reader.onload = async (event) => {
         try {
           const typedarray = new Uint8Array(event.target.result);
-          const pdf = await pdfjs.getDocument(typedarray).promise;
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
           let fullText = "";
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -124,9 +64,8 @@ export default function Dashboard() {
           setFileName(file.name);
           localStorage.setItem('resume_text', fullText);
           localStorage.setItem('resume_filename', file.name);
-          toast.success("Resume processed!");
         } catch (err) {
-          toast.error("Could not read PDF");
+          toast.error("Could not read PDF")
         }
       };
       reader.readAsArrayBuffer(file);
@@ -137,7 +76,6 @@ export default function Dashboard() {
         setFileName(file.name);
         localStorage.setItem('resume_text', event.target.result);
         localStorage.setItem('resume_filename', file.name);
-        toast.success("Text resume loaded!");
       };
       reader.readAsText(file);
     }
@@ -148,7 +86,6 @@ export default function Dashboard() {
     setFileName('');
     localStorage.removeItem('resume_text');
     localStorage.removeItem('resume_filename');
-    toast("Vault cleared");
   };
 
   const handleAIAnalysis = async (job) => {
@@ -165,7 +102,7 @@ export default function Dashboard() {
     try {
       const storedResume = localStorage.getItem('resume_text');
       if (!storedResume || storedResume.trim().length === 0) {
-        throw new Error('Upload your resume in the Resume Vault first.');
+        throw new Error('No resume found. Please upload your resume in the Resume Vault first.');
       }
 
       const response = await fetch('/api/analyze-match', {
@@ -204,9 +141,38 @@ export default function Dashboard() {
       setShowForm(false);
       setFormData({ company_name: '', title: '', location: '', salary_range: '', job_url: '', status: 'saved', notes: '' });
       loadJobs();
-      toast.success("Job added!");
     } catch (err) { toast.error("Failed to create job"); }
   };
+
+  const handleDelete = async (jobId) => {
+  // Use window.confirm for safety
+  if (!window.confirm('Are you sure you want to delete this application?')) return;
+  
+  try {
+    // 1. Get the token from localStorage
+    const token = localStorage.getItem("token");
+    
+    // 2. Perform the DELETE request with the Token
+    const response = await fetch(`/api/jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`, 
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      toast.success("Job deleted successfully"); 
+      loadJobs(); 
+    } else {
+      const errorData = await response.json();
+      toast.error(errorData.detail || "Failed to delete");
+    }
+  } catch (err) { 
+    console.error(err);
+    toast.error("An error occurred while deleting"); 
+  }
+};
 
   const statusStyles = {
     saved: 'bg-slate-100 text-slate-600 border-slate-200',
