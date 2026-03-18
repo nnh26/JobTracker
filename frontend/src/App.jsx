@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   const [view, setView] = useState('landing');
@@ -17,6 +18,31 @@ function App() {
     setView('login');
   };
 
+  function App() {
+  return (
+    <Router>
+      {/* 2. Place the Toaster here so it stays on top of every page */}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          style: {
+            background: '#333',
+            color: '#fff',
+            borderRadius: '10px',
+          },
+        }} 
+      />
+      
+      <Navbar />
+      
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        {/* ... any other routes you have */}
+      </Routes>
+    </Router>
+  );
+}
   const handleLogout = () => {
     localStorage.removeItem('token');
     setView('landing');

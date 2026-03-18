@@ -40,7 +40,7 @@ export default function Login({ onLogin, onBackToHome, initialMode = true }) {
           password: formData.password,
           full_name: formData.full_name
         });
-        alert('Account created! You can now sign in.');
+        toast.success("Account created! Welcome!")
         setIsLogin(true);
       }
     } catch (err) {

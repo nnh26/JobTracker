@@ -64,7 +64,7 @@ export default function Dashboard() {
           localStorage.setItem('resume_text', fullText);
           localStorage.setItem('resume_filename', file.name);
         } catch (err) {
-          alert("Failed to read PDF. Try a .txt file.");
+          toast.error("Could not read PDF")
         }
       };
       reader.readAsArrayBuffer(file);
@@ -140,7 +140,7 @@ export default function Dashboard() {
       setShowForm(false);
       setFormData({ company_name: '', title: '', location: '', salary_range: '', job_url: '', status: 'saved', notes: '' });
       loadJobs();
-    } catch (err) { alert('Failed to create job'); }
+    } catch (err) { toast.error("Failed to create job"); }
   };
 
   const handleDelete = async (jobId) => {
@@ -148,7 +148,7 @@ export default function Dashboard() {
     try {
       await jobsAPI.delete(jobId);
       loadJobs();
-    } catch (err) { alert('Failed to delete'); }
+    } catch (err) { toast.error("Failed to delete job"); }
   };
 
   const statusStyles = {
