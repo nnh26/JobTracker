@@ -191,6 +191,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     token = auth.create_access_token(data={"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
+#health
+@app.get("/api/health")
+async def health_check():
+    return {"status": "online", "database": "connected"}
+
 # For local development
 if __name__ == "__main__":
     import uvicorn
