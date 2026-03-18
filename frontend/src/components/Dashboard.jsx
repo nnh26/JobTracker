@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { jobsAPI } from "../api";
 import { 
   Plus, LogOut, Briefcase, MapPin, DollarSign, ExternalLink, 
@@ -144,12 +145,34 @@ export default function Dashboard() {
   };
 
   const handleDelete = async (jobId) => {
-    if (!window.confirm('Delete this application?')) return;
-    try {
-      await jobsAPI.delete(jobId);
-      loadJobs();
-    } catch (err) { toast.error("Failed to delete job"); }
-  };
+  // Use window.confirm for safety
+  if (!window.confirm('Are you sure you want to delete this application?')) return;
+  
+  try {
+    // 1. Get the token from localStorage
+    const token = localStorage.getItem("token");
+    
+    // 2. Perform the DELETE request with the Token
+    const response = await fetch(`/api/jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`, 
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      toast.success("Job deleted successfully"); 
+      loadJobs(); 
+    } else {
+      const errorData = await response.json();
+      toast.error(errorData.detail || "Failed to delete");
+    }
+  } catch (err) { 
+    console.error(err);
+    toast.error("An error occurred while deleting"); 
+  }
+};
 
   const statusStyles = {
     saved: 'bg-slate-100 text-slate-600 border-slate-200',

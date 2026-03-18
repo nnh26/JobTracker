@@ -138,6 +138,24 @@ async def create_job(
     )
     return result.scalar_one()
 
+@app.delete("/api/jobs/{job_id}")
+async def delete_job(
+    job_id: int, 
+    db: AsyncSession = Depends(get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    result = await db.execute(
+        select(models.Job).where(models.Job.id == job_id, models.Job.user_id == current_user.id)
+    )
+    job = result.scalar_one_or_none()
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job application not found")
+
+    await db.delete(job)
+    await db.commit()
+    return {"message": "Job deleted successfully"}
+
 # --- 4. AI ANALYSIS ---
 
 @app.post("/api/analyze-match")

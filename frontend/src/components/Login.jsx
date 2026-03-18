@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Briefcase, User, Mail, Lock, UserCircle, Eye, EyeOff, ArrowRight, XCircle } from 'lucide-react';
 import { authAPI } from '../api';
 import { cn } from '../lib/utils';
+import { toast } from 'react-hot-toast';
 
 export default function Login({ onLogin, onBackToHome, initialMode = true }) {
   // Sets whether to show Login (true) or Register (false) based on which button was clicked
