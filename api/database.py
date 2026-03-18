@@ -33,10 +33,12 @@ db_url = settings.database_url
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# Create the async engine
+
+# In api/database.py
 engine = create_async_engine(
-    db_url,
-    echo=True,  # Useful for debugging SQL queries
+    SQLALCHEMY_DATABASE_URL,
+    echo=True,
+    connect_args={"ssl": "require"} # This is the crucial part for Vercel
 )
 
 # Session factory
