@@ -155,7 +155,7 @@ async def analyze_match(data: dict = Body(...)):
     """
     
     try:
-        response = ai_client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
+        response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         clean_text = response.text.replace('```json', '').replace('```', '').strip()
         return json.loads(clean_text)
     except Exception as e:
