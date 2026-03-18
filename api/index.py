@@ -1,4 +1,5 @@
 import json
+import re
 import os
 import io
 import PyPDF2
@@ -141,25 +142,47 @@ async def create_job(
 
 @app.post("/api/analyze-match")
 async def analyze_match(data: dict = Body(...)):
-    job_text = data.get("jobDescription", "")
-    resume_text = data.get("resumeText", "")
+    job_text = data.get("jobDescription", "").strip()
+    resume_text = data.get("resumeText", "").strip()
     
     if not job_text or not resume_text:
         raise HTTPException(status_code=400, detail="Missing data")
     
+    # SYSTEM INSTRUCTION: Keeps the response fast and strictly JSON
+    sys_instruct = "You are a professional career coach. You must return ONLY a JSON object. No conversational text."
+    
     prompt = f"""
-    Analyze the match between this resume and job description.
-    RESUME: {resume_text}
-    JOB: {job_text}
-    Return ONLY JSON: {{"score": int, "missingKeywords": [], "resumeFix": "string", "strategy": "string"}}
+    Compare this Resume and Job Description.
+    RESUME: {resume_text[:4000]} # Truncate to save tokens/time
+    JOB: {job_text[:4000]}
+    
+    Return this exact JSON format:
+    {{
+      "score": int, 
+      "missingKeywords": ["list", "of", "strings"], 
+      "resumeFix": "one specific sentence to add", 
+      "strategy": "one sentence interview tip"
+    }}
     """
     
     try:
-        response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
-        clean_text = response.text.replace('```json', '').replace('```', '').strip()
-        return json.loads(clean_text)
+        # Using the preview model for best performance in March 2026
+        response = ai_client.models.generate_content(
+            model='gemini-3-flash-preview', 
+            contents=prompt,
+            config={'system_instruction': sys_instruct}
+        )
+        
+        # Robust JSON extraction using regex
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        if not match:
+            raise ValueError("AI failed to return valid JSON format")
+            
+        return json.loads(match.group())
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+        print(f"Detailed AI Error: {str(e)}") # Visible in Vercel Logs
+        raise HTTPException(status_code=500, detail="AI Analysis timed out or failed. Please try a shorter description.")
 
 # --- 5. AUTH ENDPOINTS ---
 
