@@ -18,42 +18,43 @@ from dotenv import load_dotenv
 import models
 import schemas
 import auth
-from database import engine, get_db, Base
+from database import engine, get_db, Base, get_settings
 
 # --- 1. CONFIGURATION ---
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+settings = get_settings()
 
-if not GEMINI_API_KEY:
-    raise ValueError("Missing GEMINI_API_KEY in .env file")
+if not settings.gemini_api_key:
+    raise ValueError("Missing GEMINI_API_KEY in environment variables")
 
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
+ai_client = genai.Client(api_key=settings.gemini_api_key)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup
+    # Create tables on startup in Supabase
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("Database tables created & API is Live!")
+    print("Database tables verified & API is Live!")
     yield
 
-app = FastAPI()
+# Prepare the App with lifespan
+app = FastAPI(lifespan=lifespan)
 
 # CORS Fix for React (Vite)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all domains (e.g., your Vercel URL)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows GET, POST, etc.
-    allow_headers=["*"],  # Allows Authorization headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/api")
 async def root():
-    return {"message": "Job Tracker API is Online"}
+    return {"message": "Job Tracker API is Online", "version": "1.0.0"}
 
-# --- 2. RESUME PARSING (PDF, DOCX, TXT) ---
-@app.post("/parse-resume")
+# --- 2. RESUME PARSING ---
+@app.post("/api/parse-resume")
 async def parse_resume(file: UploadFile = File(...)):
     try:
         content = await file.read()
@@ -64,14 +65,13 @@ async def parse_resume(file: UploadFile = File(...)):
             pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
             for page in pdf_reader.pages:
                 page_text = page.extract_text()
-                if page_text:  # Only add if text was extracted
+                if page_text:
                     extracted_text += page_text + "\n"
             
-            # If no text extracted, PDF might be scanned/image-based
             if not extracted_text.strip():
                 raise HTTPException(
                     status_code=400, 
-                    detail="Could not extract text from PDF. It may be scanned/image-based. Please use a text-based PDF or convert to .txt"
+                    detail="Could not extract text from PDF. It may be scanned. Please use a text-based file."
                 )
                 
         elif filename.endswith(".docx"):
@@ -81,35 +81,34 @@ async def parse_resume(file: UploadFile = File(...)):
         elif filename.endswith(".txt"):
             extracted_text = content.decode("utf-8")
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file format. Use PDF, DOCX, or TXT")
+            raise HTTPException(status_code=400, detail="Unsupported format. Use PDF, DOCX, or TXT")
         
-        final_text = extracted_text.strip()
+        return {"text": extracted_text.strip()}
         
-        if not final_text:
-            raise HTTPException(status_code=400, detail="No text found in file")
-            
-        print(f"Extracted {len(final_text)} characters from {filename}")
-        return {"text": final_text}
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Parse Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Could not read the file: {str(e)}")
-# --- 3. JOB ENDPOINTS (CREATE, READ, UPDATE, DELETE) ---
+        raise HTTPException(status_code=500, detail=f"File processing error: {str(e)}")
 
-@app.get("/jobs", response_model=List[schemas.JobResponse])
-async def get_jobs(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.Job).options(selectinload(models.Job.company)))
+# --- 3. JOB ENDPOINTS ---
+
+@app.get("/api/jobs", response_model=List[schemas.JobResponse])
+async def get_jobs(
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    result = await db.execute(
+        select(models.Job)
+        .where(models.Job.user_id == current_user.id)
+        .options(selectinload(models.Job.company))
+    )
     return result.scalars().all()
 
-@app.post("/jobs", response_model=schemas.JobResponse)
+@app.post("/api/jobs", response_model=schemas.JobResponse)
 async def create_job(
     job: schemas.JobCreate, 
     db: AsyncSession = Depends(get_db), 
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Handle Company
+    # Handle Company Logic
     res = await db.execute(select(models.Company).where(models.Company.name == job.company_name))
     company = res.scalar_one_or_none() or models.Company(name=job.company_name)
     if not company.id:
@@ -128,9 +127,9 @@ async def create_job(
     )
     db.add(db_job)
     await db.commit()
-    
-    # RELOAD WITH EAGER LOADING
     await db.refresh(db_job)
+    
+    # Reload with eager loading for the response
     result = await db.execute(
         select(models.Job)
         .where(models.Job.id == db_job.id)
@@ -138,120 +137,34 @@ async def create_job(
     )
     return result.scalar_one()
 
-@app.put("/jobs/{job_id}", response_model=schemas.JobResponse)
-async def update_job(job_id: int, job_update: schemas.JobCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(models.Job).where(models.Job.id == job_id).options(selectinload(models.Job.company))
-    )
-    db_job = result.scalar_one_or_none()
-    
-    if not db_job:
-        raise HTTPException(status_code=404, detail="Job not found")
+# --- 4. AI ANALYSIS ---
 
-    # Update Company name if it changed
-    c_res = await db.execute(select(models.Company).where(models.Company.name == job_update.company_name))
-    company = c_res.scalar_one_or_none() or models.Company(name=job_update.company_name)
-    if not company.id:
-        db.add(company)
-        await db.flush()
-
-    # Explicitly update fields
-    db_job.company_id = company.id
-    db_job.title = job_update.title
-    db_job.job_url = job_update.job_url
-    db_job.location = job_update.location
-    db_job.salary_range = job_update.salary_range
-    db_job.status = job_update.status
-    db_job.notes = job_update.notes
-    
-    await db.commit()
-    await db.refresh(db_job)
-    return db_job
-
-@app.delete("/jobs/{job_id}")
-async def delete_job(job_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.Job).where(models.Job.id == job_id))
-    job = result.scalar_one_or_none()
-    if job:
-        await db.delete(job)
-        await db.commit()
-    return {"message": "Deleted"}
-
-# --- 4. AI ANALYSIS ENDPOINT (MOCK VERSION) ---
-'''/*
-@app.post("/analyze-match")
-async def analyze_match(data: dict = Body(...)):
-    job_text = data.get("jobDescription", "")
-    resume_text = data.get("resumeText", "")
-    
-    import random
-    
-    job_title = data.get("jobTitle", "")
-    
-    strategies = [
-        "Prepare a story about a time you optimized system performance under pressure.",
-        "Focus on your experience working in cross-functional teams.",
-        "Highlight a project where you took ownership from concept to deployment.",
-        "Prepare examples of how you've handled production incidents.",
-        "Emphasize your experience mentoring junior engineers."
-    ]
-    
-    fixes = [
-        f"Add a bullet point highlighting your experience with distributed systems.",
-        f"Include specific metrics about performance improvements you've achieved.",
-        f"Mention your experience with the specific tech stack they're using.",
-        f"Add examples of system design experience at scale.",
-        f"Highlight collaborative projects with product and design teams."
-    ]
-    
-    return {
-        "score": random.randint(78, 94),
-        "missingKeywords": random.sample(["Docker", "Kubernetes", "CI/CD", "TypeScript", "GraphQL", "Microservices", "AWS", "System Design"], 3),
-        "resumeFix": random.choice(fixes),
-        "strategy": random.choice(strategies)
-    }
-'''
-#real gemini api version below
-@app.post("/analyze-match")
+@app.post("/api/analyze-match")
 async def analyze_match(data: dict = Body(...)):
     job_text = data.get("jobDescription", "")
     resume_text = data.get("resumeText", "")
     
     if not job_text or not resume_text:
-        raise HTTPException(status_code=400, detail="Missing job description or resume")
+        raise HTTPException(status_code=400, detail="Missing data")
     
     prompt = f"""
-    You are an expert technical recruiter. Analyze how well this candidate's resume matches the job description.
-    
-    RESUME:
-    {resume_text}
-    
-    JOB DESCRIPTION:
-    {job_text}
-    
-    Return ONLY a valid JSON object (no markdown, no backticks) with these exact keys:
-    - "score": integer between 0-100
-    - "missingKeywords": array of 3-5 important missing technical skills
-    - "resumeFix": one specific actionable suggestion to improve the resume for this role
-    - "strategy": one concrete interview preparation tip based on the job requirements
-    
-    Example format: {{"score": 85, "missingKeywords": ["Docker", "AWS"], "resumeFix": "Add metrics...", "strategy": "Prepare examples..."}}
+    Analyze the match between this resume and job description.
+    RESUME: {resume_text}
+    JOB: {job_text}
+    Return ONLY JSON: {{"score": int, "missingKeywords": [], "resumeFix": "string", "strategy": "string"}}
     """
     
     try:
-        response = ai_client.models.generate_content(
-            model='gemini-2.5-flash',  
-            contents=prompt
-        )
+        response = ai_client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
         clean_text = response.text.replace('```json', '').replace('```', '').strip()
         return json.loads(clean_text)
     except Exception as e:
-        print(f"Gemini Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"AI Analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+
 # --- 5. AUTH ENDPOINTS ---
-@app.post("/auth/register", response_model=schemas.UserResponse)
+
+@app.post("/api/auth/register", response_model=schemas.UserResponse)
 async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    # Check if user exists
     res = await db.execute(select(models.User).where(models.User.email == user.email))
     if res.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -267,7 +180,7 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
     await db.refresh(db_user)
     return db_user
 
-@app.post("/auth/login", response_model=schemas.Token)
+@app.post("/api/auth/login", response_model=schemas.Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     res = await db.execute(select(models.User).where(models.User.username == form_data.username))
     user = res.scalar_one_or_none()
@@ -278,6 +191,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     token = auth.create_access_token(data={"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
+# For local development
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("index:app", host="0.0.0.0", port=8000, reload=True)

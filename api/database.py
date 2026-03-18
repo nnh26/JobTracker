@@ -20,27 +20,27 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
-        extra = "ignore" # Prevents errors if extra variables exist in Railway
+        extra = "ignore" 
 
 @lru_cache()
 def get_settings():
     return Settings()
 
 # --- DATABASE ENGINE SETUP ---
-
 settings = get_settings()
 
-# We use db_url here...
+# Prepare the URL for Asyncpg
 db_url = settings.database_url
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# ...so we must use db_url here too!
+# Create the Async Engine
 engine = create_async_engine(
-    db_url, # Make sure this says db_url, not SQLALCHEMY_DATABASE_URL
+    db_url, 
     echo=True,
-    connect_args={"ssl": "require"}
+    connect_args={"ssl": "require"} # Required for Supabase/Vercel
 )
+
 # Session factory
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -56,7 +56,6 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            
             await session.commit()
         except Exception:
             await session.rollback()
