@@ -330,7 +330,6 @@ If you have any questions or run into issues, please [open an issue](https://git
 
 ---
 
-##  Also Create These Files:
 
 ### `LICENSE` (MIT License)
 ```
