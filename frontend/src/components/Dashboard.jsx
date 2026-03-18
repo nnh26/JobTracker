@@ -104,7 +104,7 @@ export default function Dashboard() {
         throw new Error('No resume found. Please upload your resume in the Resume Vault first.');
       }
 
-      const response = await fetch('http://localhost:8000/analyze-match', {
+      const response = await fetch('/api/analyze-match', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
