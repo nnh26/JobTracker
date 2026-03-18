@@ -37,15 +37,15 @@ async def lifespan(app: FastAPI):
     print("Database tables created & API is Live!")
     yield
 
-app = FastAPI(title="Job Tracker API", lifespan=lifespan)
+app = FastAPI()
 
 # CORS Fix for React (Vite)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origins=["*"],  # Allows all domains (e.g., your Vercel URL)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows GET, POST, etc.
+    allow_headers=["*"],  # Allows Authorization headers
 )
 
 @app.get("/")
