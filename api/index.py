@@ -15,10 +15,10 @@ from sqlalchemy.orm import selectinload
 from dotenv import load_dotenv
 
 # Import local modules
-import models
-import schemas
-import auth
-from database import engine, get_db, Base, get_settings
+from . import models
+from . import schemas
+from . import auth
+from .database import engine, get_db, Base, get_settings
 
 # --- 1. CONFIGURATION ---
 load_dotenv()
