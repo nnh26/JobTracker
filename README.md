@@ -231,7 +231,7 @@ DATABASE_URL=postgresql+asyncpg://user:password@host:port/dbname
 ```
 
 ### AI Model
-Currently using **Gemini 1.5 Flash**. You can change the model in `backend/main.py`:
+Currently using **Gemini 3.0  Flash**. You can change the model in `backend/main.py`:
 ```python
 model='gemini-1.5-flash'  # or 'gemini-1.5-pro' for better results
 ```
