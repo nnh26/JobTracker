@@ -7,6 +7,7 @@ A full-stack web application that helps job seekers organize their applications 
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green)
 ![React](https://img.shields.io/badge/React-18+-61DAFB)
 
+**🌐 Live Demo:** https://nowshin-jobtracker.vercel.app/
 ##  Features
 
 ### 📊 Job Management
