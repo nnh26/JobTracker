@@ -6,11 +6,8 @@ import {
   CheckCircle2, X, Loader2, UserCircle, FileText, Upload, Trash
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js Worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
+import * as pdfjs from 'pdfjs-dist';
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 export default function Dashboard() {
   // --- STATE ---
   const [view, setView] = useState('overview'); 
