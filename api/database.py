@@ -27,20 +27,20 @@ def get_settings():
     return Settings()
 
 # --- DATABASE ENGINE SETUP ---
+
 settings = get_settings()
 
+# We use db_url here...
 db_url = settings.database_url
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-
-# In api/database.py
+# ...so we must use db_url here too!
 engine = create_async_engine(
-    SQLALCHEMY_DATABASE_URL,
+    db_url, # Make sure this says db_url, not SQLALCHEMY_DATABASE_URL
     echo=True,
-    connect_args={"ssl": "require"} # This is the crucial part for Vercel
+    connect_args={"ssl": "require"}
 )
-
 # Session factory
 AsyncSessionLocal = async_sessionmaker(
     engine,
