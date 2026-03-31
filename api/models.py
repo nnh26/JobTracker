@@ -21,6 +21,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     jobs = relationship("Job", back_populates="user")
 
 class Company(Base):

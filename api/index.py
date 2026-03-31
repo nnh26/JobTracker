@@ -2,10 +2,15 @@ import json
 import re
 import os
 import io
+import secrets
+import smtplib
 import PyPDF2
 import docx
 from typing import List
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from google import genai
 from fastapi import FastAPI, Depends, HTTPException, status, Body, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -247,6 +252,66 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
         
     token = auth.create_access_token(data={"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/api/auth/forgot-password")
+async def forgot_password(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    email = data.get("email", "").strip()
+    res = await db.execute(select(models.User).where(models.User.email == email))
+    user = res.scalar_one_or_none()
+
+    if user:
+        code = str(secrets.randbelow(900000) + 100000)
+        user.reset_token = auth.get_password_hash(code)
+        user.reset_token_expires = datetime.utcnow() + timedelta(minutes=15)
+        await db.commit()
+
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = f"JobTracker <{settings.smtp_user}>"
+            msg['To'] = email
+            msg['Subject'] = 'JobTracker — Your Password Reset Code'
+            msg.attach(MIMEText(
+                f"Hi {user.full_name or user.username},\n\n"
+                f"Your password reset code is:\n\n  {code}\n\n"
+                f"This code expires in 15 minutes. If you didn't request this, ignore this email.\n\n"
+                f"— JobTracker",
+                'plain'
+            ))
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                server.starttls()
+                server.login(settings.smtp_user, settings.smtp_password)
+                server.send_message(msg)
+        except Exception as e:
+            print(f"Email error: {e}")
+
+    return {"message": "If that email is registered, a reset code was sent."}
+
+
+@app.post("/api/auth/reset-password")
+async def reset_password(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    email = data.get("email", "").strip()
+    code = data.get("code", "").strip()
+    new_password = data.get("new_password", "").strip()
+
+    res = await db.execute(select(models.User).where(models.User.email == email))
+    user = res.scalar_one_or_none()
+
+    if not user or not user.reset_token or not user.reset_token_expires:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code")
+
+    if datetime.utcnow() > user.reset_token_expires:
+        raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one.")
+
+    if not auth.verify_password(code, user.reset_token):
+        raise HTTPException(status_code=400, detail="Incorrect reset code")
+
+    user.hashed_password = auth.get_password_hash(new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    await db.commit()
+
+    return {"message": "Password reset successfully"}
+
 
 #health
 @app.get("/api/health")

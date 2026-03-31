@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    
+
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore" 
